@@ -1,0 +1,10 @@
+node_modules
+.env
+.env.*
+!.env.example
+
+# Fotos subidas por usuarios
+uploads/*
+!uploads/.gitkeep
+
+.DS_Store
