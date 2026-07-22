@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import { Animal, Usuario } from "../models/index.js";
 import { AppError } from "../utils/AppError.js";
+import { logInfo } from "../utils/logger.js";
 
 // para mostrar quien publico el animal
 const incluirPublicador = { include: [{ model: Usuario, attributes: ["nombre"] }] };
@@ -49,6 +50,7 @@ export async function create(req, res) {
   if (req.file) datos.foto_url = `/uploads/${req.file.filename}`;
   
   const animal = await Animal.create({ ...datos, usuario_id: req.usuario.sub });
+  logInfo("Animal publicado", { animalId: animal.id, usuarioId: req.usuario.sub });
   res.status(201).json(animal);
 }
 
@@ -56,10 +58,13 @@ export async function update(req, res) {
   const datos = normalizarBody(req.body);
   if (req.file) datos.foto_url = `/uploads/${req.file.filename}`;
   await req.recurso.update(datos);
+  logInfo("Animal actualizado", { animalId: req.recurso.id, usuarioId: req.usuario.sub });
   res.json(req.recurso);
 }
 
 export async function remove(req, res) {
+  const animalId = req.recurso.id;
   await req.recurso.destroy();
+  logInfo("Animal eliminado", { animalId, usuarioId: req.usuario.sub });
   res.status(204).end();
 }

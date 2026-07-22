@@ -1,6 +1,7 @@
 import { Op } from "sequelize";
 import { Jornada, Vacuna } from "../models/index.js";
 import { AppError } from "../utils/AppError.js";
+import { logInfo } from "../utils/logger.js";
 
 // para traer siempre las vacunas junto con la jornada
 const incluirVacunas = { include: [{ model: Vacuna, through: { attributes: [] } }] };
@@ -35,6 +36,7 @@ export async function create(req, res) {
   await jornada.setVacunas(vacunas);
   // Volvemos a conulstar para que venga con las vacunas
   const jornadaConVacunas = await Jornada.findByPk(jornada.id, incluirVacunas);
+  logInfo("Jornada publicada", { jornadaId: jornada.id, usuarioId: req.usuario.sub });
   res.status(201).json(jornadaConVacunas);
 }
 
@@ -43,10 +45,13 @@ export async function update(req, res) {
   await req.recurso.update(datos);
   if (vacunas) await req.recurso.setVacunas(vacunas);
   const jornadaActualizada = await Jornada.findByPk(req.recurso.id, incluirVacunas);
+  logInfo("Jornada actualizada", { jornadaId: req.recurso.id, usuarioId: req.usuario.sub });
   res.json(jornadaActualizada);
 }
 
 export async function remove(req, res) {
+  const jornadaId = req.recurso.id;
   await req.recurso.destroy();
+  logInfo("Jornada eliminada", { jornadaId, usuarioId: req.usuario.sub });
   res.status(204).end();
 }
