@@ -11,6 +11,8 @@ import jornadasRoutes from "./routes/jornadas.routes.js";
 import vacunasRoutes from "./routes/vacunas.routes.js";
 import usuariosRoutes from "./routes/usuarios.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { requestLogger } from "./middleware/requestLogger.js";
+import { logInfo } from "./utils/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +35,7 @@ app.use(
 );
 app.use(express.json({ limit: "100kb" }));
 app.use(cookieParser());
+app.use(requestLogger);
 
 // para servir las fotos
 app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
@@ -49,5 +52,5 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT ?? 4000;
 app.listen(PORT, () => {
-  console.log(`PawCare API escuchando en http://localhost:${PORT}`);
+  logInfo(`PawCare API escuchando en http://localhost:${PORT}`);
 });
