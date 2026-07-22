@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import { Usuario, RefreshToken, LoginAttempt } from "../models/index.js";
 import { hashPassword, verifyPassword } from "../utils/hash.js";
 import { signAccessToken, generateRefreshToken, hashRefreshToken } from "../utils/jwt.js";
+import { logInfo, logWarn } from "../utils/logger.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const REFRESH_COOKIE = "refresh_token";
@@ -48,11 +49,13 @@ export async function register(req, res) {
   const { nombre, email, telefono, password } = req.body ?? {};
 
   if (!nombre?.trim() || !EMAIL_RE.test(email ?? "") || !password || password.length < 6) {
+    logWarn("Registro rechazado: datos invalidos", { email });
     return res.status(400).json({ error: "Datos de registro inválidos." });
   }
 
   const existente = await Usuario.findOne({ where: { email } });
   if (existente) {
+    logWarn("Registro rechazado: correo ya registrado", { email });
     return res.status(409).json({ error: "Este correo ya está registrado." });
   }
 
@@ -63,6 +66,8 @@ export async function register(req, res) {
     telefono: telefono || null,
     password_hash,
   });
+
+  logInfo("Usuario registrado", { usuarioId: usuario.id, email: usuario.email });
 
   const accessToken = await issueSession(res, usuario);
   res.status(201).json({ accessToken, user: toPublicUser(usuario) });
@@ -81,6 +86,7 @@ export async function login(req, res) {
     where: { email, exitoso: false, creado_en: { [Op.gt]: quinceMinAtras } },
   });
   if (intentosFallidos >= MAX_INTENTOS_FALLIDOS) {
+    logWarn("Login bloqueado por demasiados intentos fallidos", { email, ip });
     return res.status(429).json({ error: "Demasiados intentos fallidos. Intenta de nuevo en 15 minutos." });
   }
 
@@ -99,8 +105,11 @@ export async function login(req, res) {
   });
 
   if (!usuario || !usuario.activo || !passwordValida) {
+    logWarn("Login fallido", { email, ip });
     return res.status(401).json({ error: "Correo o contraseña incorrectos." });
   }
+
+  logInfo("Login exitoso", { usuarioId: usuario.id, email });
 
   const accessToken = await issueSession(res, usuario);
   res.json({ accessToken, user: toPublicUser(usuario) });
@@ -121,6 +130,7 @@ export async function refresh(req, res) {
     !registro || registro.revocado_en || new Date(registro.expira_en) < new Date() || !usuarioAsociado?.activo;
 
   if (invalido) {
+    logWarn("Refresh rechazado: token invalido o expirado");
     res.clearCookie(REFRESH_COOKIE, cookieOptions());
     return res.status(401).json({ error: "Sesión expirada, inicia sesión de nuevo." });
   }
@@ -129,6 +139,8 @@ export async function refresh(req, res) {
   // que un token robado y reutilizado deje huella (reuse detection básico).
   registro.revocado_en = new Date();
   await registro.save();
+
+  logInfo("Refresh de sesion", { usuarioId: usuarioAsociado.id });
 
   const accessToken = await issueSession(res, usuarioAsociado);
   res.json({ accessToken, user: toPublicUser(usuarioAsociado) });
@@ -142,6 +154,7 @@ export async function logout(req, res) {
       { revocado_en: new Date() },
       { where: { token_hash: hash, revocado_en: null } }
     );
+    logInfo("Logout");
   }
   res.clearCookie(REFRESH_COOKIE, cookieOptions());
   res.status(204).end();
