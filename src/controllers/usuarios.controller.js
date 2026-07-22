@@ -1,5 +1,6 @@
 import { Usuario } from "../models/index.js";
 import { AppError } from "../utils/AppError.js";
+import { logInfo } from "../utils/logger.js";
 
 // lista de usuarios para el panel de administracion (sin password_hash)
 export async function index(_req, res) {
@@ -26,5 +27,10 @@ export async function actualizarEstado(req, res) {
 
   usuario.activo = activo;
   await usuario.save();
+  logInfo("Estado de usuario actualizado", {
+    usuarioId: usuario.id,
+    activo: usuario.activo,
+    adminId: req.usuario.sub,
+  });
   res.json({ id: usuario.id, activo: usuario.activo });
 }

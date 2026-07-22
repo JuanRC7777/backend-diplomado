@@ -1,5 +1,6 @@
 import { Vacuna } from "../models/index.js";
 import { AppError } from "../utils/AppError.js";
+import { logInfo } from "../utils/logger.js";
 
 // devuelve el catagolo de vacunas ordenado
 export async function index(req, res) {
@@ -17,6 +18,7 @@ export async function create(req, res) {
   if (existente) throw new AppError(409, "Esa vacuna ya existe en el catalogo.");
 
   const vacuna = await Vacuna.create({ nombre: nombre.trim() });
+  logInfo("Vacuna agregada al catalogo", { vacunaId: vacuna.id, nombre: vacuna.nombre, adminId: req.usuario.sub });
   res.status(201).json(vacuna);
 }
 
@@ -26,5 +28,6 @@ export async function remove(req, res) {
   if (!vacuna) throw new AppError(404, "Vacuna no encontrada.");
 
   await vacuna.destroy();
+  logInfo("Vacuna eliminada del catalogo", { vacunaId: vacuna.id, nombre: vacuna.nombre, adminId: req.usuario.sub });
   res.status(204).end();
 }
