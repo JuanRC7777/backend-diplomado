@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth.routes.js";
 import animalesRoutes from "./routes/animales.routes.js";
 import jornadasRoutes from "./routes/jornadas.routes.js";
 import vacunasRoutes from "./routes/vacunas.routes.js";
+import usuariosRoutes from "./routes/usuarios.routes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/animales", animalesRoutes);
 app.use("/api/jornadas", jornadasRoutes);
 app.use("/api/vacunas", vacunasRoutes);
+app.use("/api/usuarios", usuariosRoutes);
 
 app.use((_req, res) => res.status(404).json({ error: "Ruta no encontrada." }));
 app.use(errorHandler);
