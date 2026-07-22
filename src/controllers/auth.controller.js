@@ -25,6 +25,7 @@ function toPublicUser(usuario) {
     nombre: usuario.nombre,
     email: usuario.email,
     telefono: usuario.telefono ?? undefined,
+    rol: usuario.rol,
   };
 }
 
