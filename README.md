@@ -58,8 +58,11 @@ Con `.env` ya configurado:
 
 \`\`\`bash
 npm run db:migrate   # crea las 7 tablas
-npm run db:seed      # siembra el catálogo de vacunas
+npm run db:seed      # siembra el catálogo de vacunas y un usuario administrador
 \`\`\`
+
+El seeder crea un usuario admin de prueba: `admin@pawcare.co` / `admin123` (cámbiala en un
+entorno real). Con ese usuario se accede al panel `/admin` del frontend.
 
 ## 5. Levantar el servidor
 
@@ -93,4 +96,5 @@ src/
 - `/api/auth` — registro, login, refresh, logout
 - `/api/animales` — CRUD de animales en adopción
 - `/api/jornadas` — CRUD de jornadas de vacunación
-- `/api/vacunas` — catálogo de vacunas (solo lectura)
+- `/api/vacunas` — catálogo de vacunas (lectura pública; crear/eliminar solo admin)
+- `/api/usuarios` — listar y activar/desactivar cuentas (solo admin)
