@@ -1,6 +1,9 @@
 import { Op } from "sequelize";
-import { Animal } from "../models/index.js";
+import { Animal, Usuario } from "../models/index.js";
 import { AppError } from "../utils/AppError.js";
+
+// para mostrar quien publico el animal
+const incluirPublicador = { include: [{ model: Usuario, attributes: ["nombre"] }] };
 
 // trae los animles, se puede filtrar
 export async function index(req, res) {
@@ -16,12 +19,16 @@ export async function index(req, res) {
     ];
   }
 
-  const animales = await Animal.findAll({ where, order: [["fecha_publicacion", "DESC"]] });
+  const animales = await Animal.findAll({
+    where,
+    order: [["fecha_publicacion", "DESC"]],
+    ...incluirPublicador,
+  });
   res.json(animales);
 }
 
 export async function show(req, res) {
-  const animal = await Animal.findByPk(req.params.id);
+  const animal = await Animal.findByPk(req.params.id, incluirPublicador);
   if (!animal) throw new AppError(404, "Animal no encontrado.");
   res.json(animal);
 }
