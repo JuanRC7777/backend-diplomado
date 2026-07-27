@@ -108,27 +108,130 @@ La API queda disponible en `http://localhost:4000/api`. Puedes probar que todo e
 curl http://localhost:4000/api/health
 \`\`\`
 
-## Despliegue con Docker
+## Despliegue con Docker (recomendado para un PC nuevo)
 
-La imagen **no** corre migraciones ni seeders al arrancar. Antes de desplegar una versión
-nueva, corre manualmente (fuera del contenedor, apuntando a la base de datos de producción):
+Esta sección es una receta completa, probada de punta a punta: MySQL + backend en
+contenedores, sin depender de tener MySQL instalado en el sistema. Solo necesitas
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) y Node.js (para correr
+las migraciones con `sequelize-cli`).
+
+### 1. Red de Docker
+
+Para que los contenedores se vean entre sí por nombre:
 
 \`\`\`bash
+docker network create pawcare-net
+\`\`\`
+
+### 2. Levantar MySQL
+
+\`\`\`bash
+docker run -d --name pawcare-mysql --network pawcare-net \
+  -e MYSQL_ROOT_PASSWORD=TU_PASSWORD_ROOT \
+  -e MYSQL_DATABASE=pawcare \
+  -p 3306:3306 \
+  mysql:8
+\`\`\`
+
+Espera a que esté listo (los primeros segundos MySQL se reinicia solo, es normal):
+
+\`\`\`bash
+docker exec pawcare-mysql mysqladmin ping -uroot -pTU_PASSWORD_ROOT --silent
+\`\`\`
+
+Crea el usuario de aplicación (permisos limitados, sin poder crear/alterar tablas):
+
+\`\`\`bash
+docker exec -i pawcare-mysql mysql -uroot -pTU_PASSWORD_ROOT <<'EOF'
+CREATE USER IF NOT EXISTS 'pawcare_app'@'%' IDENTIFIED BY 'TU_PASSWORD_APP';
+GRANT SELECT, INSERT, UPDATE, DELETE ON pawcare.* TO 'pawcare_app'@'%';
+FLUSH PRIVILEGES;
+EOF
+\`\`\`
+
+### 3. Migraciones y seeders
+
+Copia `.env.example` a `.env` (ver la sección de variables más arriba) con
+`DB_HOST=127.0.0.1` (el puerto 3306 ya está publicado al host) y las contraseñas que
+usaste arriba. Luego, con Node.js instalado:
+
+\`\`\`bash
+npm install
 npm run db:migrate
 npm run db:seed
 \`\`\`
 
-Luego construye y levanta el contenedor:
+> La imagen de producción del backend **no** trae `sequelize-cli` (es una dependencia de
+> desarrollo, no se instala con `npm ci --omit=dev`), por eso las migraciones se corren
+> desde el host, no desde el contenedor de la app.
+
+### 4. Construir y levantar el backend
 
 \`\`\`bash
 docker build -t pawcare-backend .
-docker run --rm -p 4000:4000 --env-file .env -e NODE_ENV=production pawcare-backend
+docker run -d --name pawcare-backend --network pawcare-net \
+  -p 4000:4000 \
+  -e NODE_ENV=production \
+  -e CORS_ORIGIN=http://localhost:8080 \
+  -e DB_HOST=pawcare-mysql \
+  -e DB_NAME=pawcare \
+  -e DB_USER=pawcare_app \
+  -e DB_PASSWORD=TU_PASSWORD_APP \
+  -e JWT_ACCESS_SECRET=$(node -e "console.log(require('crypto').randomBytes(48).toString('base64'))") \
+  pawcare-backend
 \`\`\`
 
-> El `-e NODE_ENV=production` es necesario aunque uses `--env-file .env`: tu `.env` local
-> trae `NODE_ENV=development` (para pruebas), y `-e` siempre tiene prioridad sobre
-> `--env-file`. Si se te olvida, la cookie de sesión no se marca como `secure` y viaja
-> sin exigir HTTPS.
+Nota: `DB_HOST` aquí es el **nombre del contenedor** de MySQL (`pawcare-mysql`), no
+`127.0.0.1` — los dos contenedores se hablan por la red `pawcare-net`, no por el puerto
+publicado al host. `CORS_ORIGIN` debe ser la URL exacta donde corre el frontend.
+
+Verifica que arrancó bien:
+
+\`\`\`bash
+curl http://localhost:4000/api/health
+docker logs pawcare-backend
+\`\`\`
+
+### 5. Persistencia de las fotos subidas
+
+Sin un volumen, las fotos subidas con `multer` se pierden si se recrea el contenedor.
+Para producción real, monta un volumen en `/app/uploads`:
+
+\`\`\`bash
+docker run -d --name pawcare-backend --network pawcare-net \
+  -p 4000:4000 \
+  -v pawcare-uploads:/app/uploads \
+  # ...el resto de las variables de arriba
+  pawcare-backend
+\`\`\`
+
+### Actualizar una versión ya desplegada
+
+La imagen no corre migraciones ni seeders al arrancar (a propósito, para que un fallo de
+migración nunca tumbe el arranque del servidor). Antes de reemplazar el contenedor con una
+imagen nueva, corre manualmente contra la base de datos de producción:
+
+\`\`\`bash
+npm run db:migrate
+\`\`\`
+
+Luego reconstruye la imagen y reemplaza el contenedor (`docker stop`/`docker rm` seguido del
+`docker run` del paso 4).
+
+### Solución de problemas comunes
+
+- **"Failed to fetch" / error de CORS en la consola del navegador**: `CORS_ORIGIN` del
+  backend no coincide *exactamente* con la URL desde la que abres el frontend (incluyendo
+  el puerto). No puede ser `*` porque el frontend manda `credentials: "include"`.
+- **Login funciona pero se cierra la sesión al recargar**: revisa que el frontend y el
+  backend no estén en dominios/puertos que el navegador bloquee por third-party cookies, y
+  que `CORS_ORIGIN` sea correcto.
+- **Subir una foto falla con error 500**: confirma que la carpeta `uploads/` existe (en
+  Docker se crea sola en el build; en local, créala a mano si hace falta).
+- **Si usas el cliente `mysql` de línea de comandos para revisar datos y ves tildes/ñ
+  rotas** (ej. `Bogot�` en vez de `Bogotá`): es el propio cliente `mysql`, no el backend —
+  por defecto usa `latin1` para mostrar resultados. Conéctate con
+  `mysql --default-character-set=utf8mb4 ...` para ver los datos reales.
 
 ## Estructura del proyecto
 
@@ -152,3 +255,4 @@ src/
 - `/api/jornadas` — CRUD de jornadas de vacunación
 - `/api/vacunas` — catálogo de vacunas (lectura pública; crear/eliminar solo admin)
 - `/api/usuarios` — listar y activar/desactivar cuentas (solo admin)
+- `/api/solicitudes` — solicitudes de adopción: crear es público, listar es solo admin
