@@ -6,6 +6,7 @@ import { Vacuna } from "./Vacuna.js";
 import { Animal } from "./Animal.js";
 import { Jornada } from "./Jornada.js";
 import { JornadaVacuna } from "./JornadaVacuna.js";
+import { SolicitudAdopcion } from "./SolicitudAdopcion.js";
 
 // para mayor clarides
 
@@ -33,4 +34,18 @@ Vacuna.belongsToMany(Jornada, {
   otherKey: "jornada_id",
 });
 
-export { sequelize, Usuario, RefreshToken, LoginAttempt, Vacuna, Animal, Jornada, JornadaVacuna };
+// Animal <-> SolicitudAdopcion (1:N, si se borra el animal se borran sus solicitudes)
+Animal.hasMany(SolicitudAdopcion, { foreignKey: "animal_id" });
+SolicitudAdopcion.belongsTo(Animal, { foreignKey: "animal_id" });
+
+export {
+  sequelize,
+  Usuario,
+  RefreshToken,
+  LoginAttempt,
+  Vacuna,
+  Animal,
+  Jornada,
+  JornadaVacuna,
+  SolicitudAdopcion,
+};
