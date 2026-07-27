@@ -9,8 +9,12 @@ export const sequelize = new Sequelize(
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT ?? 3306),
     dialect: "mysql",
-    dialectOptions:
-      process.env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: false } } : undefined,
+    dialectOptions: {
+      // Charset explicito para la conexion, en vez de depender del default
+      // del servidor -- las tablas ya son utf8mb4, esto lo deja consistente.
+      charset: "utf8mb4",
+      ...(process.env.DB_SSL === "true" ? { ssl: { rejectUnauthorized: false } } : {}),
+    },
     logging: false,
   }
 );
